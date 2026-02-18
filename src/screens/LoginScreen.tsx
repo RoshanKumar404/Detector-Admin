@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   input: {
+    color: COLORS.text,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.gray[300],
