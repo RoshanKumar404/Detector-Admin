@@ -11,6 +11,7 @@ import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplet
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import { apiService } from '../services/apiService';
 import { authService } from '../services/authService';
+import { aiService } from '../services/aiService';
 
 const { width } = Dimensions.get('window');
 
@@ -24,12 +25,36 @@ const ReportDetailsScreen: React.FC<ReportDetailsScreenProps> = ({ route, naviga
   const [isFetchingLocation, setIsFetchingLocation] = useState(!passedLocation);
   const [location, setLocation] = useState(passedLocation || { latitude: 0, longitude: 0 });
   const [address, setAddress] = useState(passedLocation ? 'Location captured from photo' : 'Fetching address...');
+  
+  // AI States
+  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [aiResult, setAiResult] = useState<{ className: string; probability: number } | null>(null);
 
   useEffect(() => {
     if (!passedLocation) {
       fetchRealLocation();
     }
+    runAIClassification();
   }, [passedLocation]);
+
+  const runAIClassification = async () => {
+    setIsAnalyzing(true);
+    try {
+      const predictions = await aiService.classifyImage(imageUri);
+      const result = aiService.isWaterlogged(predictions);
+      setAiResult(result);
+      
+      // Auto-set severity if high confidence water detected
+      if (result.probability > 0.8) {
+        setSeverity('high');
+        setDescription(`AI detected: ${result.className}`);
+      }
+    } catch (error) {
+      console.error('AI Error:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const fetchRealLocation = async () => {
     setIsFetchingLocation(true);
@@ -91,8 +116,8 @@ const ReportDetailsScreen: React.FC<ReportDetailsScreenProps> = ({ route, naviga
       await apiService.createIssue(
         imageUri,
         location,
-        'waterlogged', // Placeholder for AI prediction, could be based on severity
-        severity === 'critical' ? 0.95 : 0.8 // Placeholder for confidence
+        aiResult?.className || 'waterlogged',
+        aiResult?.probability || 1.0
       );
 
       // 2. Also save locally for offline access (optional/existing feature)
@@ -135,6 +160,26 @@ const ReportDetailsScreen: React.FC<ReportDetailsScreenProps> = ({ route, naviga
         <Text style={styles.title}>Report Details</Text>
 
         <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+
+        <View style={styles.aiSection}>
+          <Text style={styles.label}>AI Analysis</Text>
+          {isAnalyzing ? (
+            <View style={styles.analyzingBox}>
+              <ActivityIndicator color={COLORS.primary} size="small" />
+              <Text style={styles.analyzingText}>Analyzing image with MobileNet...</Text>
+            </View>
+          ) : (
+            <View style={[styles.aiResultBox, { borderColor: (aiResult?.probability || 0) > 0.7 ? COLORS.high : COLORS.gray[300] }]}>
+              <View style={styles.aiHeader}>
+                <Text style={styles.aiResultTitle}>{aiResult?.className.toUpperCase() || 'UNKNOWN'}</Text>
+                <Text style={styles.aiConfidence}>{( (aiResult?.probability || 0) * 100 ).toFixed(1)}% match</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${(aiResult?.probability || 0) * 100}%`, backgroundColor: (aiResult?.probability || 0) > 0.7 ? COLORS.high : COLORS.primary }]} />
+              </View>
+            </View>
+          )}
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.label}>Location</Text>
@@ -342,6 +387,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  aiSection: {
+    marginBottom: 25,
+    padding: 15,
+    backgroundColor: 'rgba(52, 152, 219, 0.05)',
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 152, 219, 0.1)',
+  },
+  analyzingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+  },
+  analyzingText: {
+    marginLeft: 10,
+    color: COLORS.gray[500],
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  aiResultBox: {
+    padding: 12,
+    backgroundColor:COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginTop: 5,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  aiResultTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.text,
+  },
+  aiConfidence: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: COLORS.gray[200],
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
   },
 });
 
