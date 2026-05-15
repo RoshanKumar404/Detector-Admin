@@ -39,7 +39,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
+          placeholder="Email plz"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
