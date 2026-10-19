@@ -1,5 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import L from 'leaflet';
+window.L = L;
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
 import App from './App.jsx';
