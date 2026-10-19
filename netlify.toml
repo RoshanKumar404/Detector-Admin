@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
   VITE_API_BASE_URL = "https://detectorbackend.onrender.com/api"
 
 [[redirects]]
